@@ -12,7 +12,6 @@
 
 #include <stdint.h>
 
-//#define STATS_ON
 typedef uint32_t key_t;
 typedef uint32_t value_t;
 
@@ -21,21 +20,11 @@ typedef struct  {
 	value_t value;
 } tuple_t;
 
-#define MAX_REQUEST_NUM 32
+#define MRAM_SIZE (20 << 20) // 20MB
+#define TUPLES_NUM (((MRAM_SIZE) / sizeof(tuple_t))) // one tuples
+#define TUPLES_NUM_PER_TASKLET ((TUPLES_NUM - 1 + NR_TASKLETS) / NR_TASKLETS)
+#define MRAM_SIZE_PER_TASKLET  ((MRAM_SIZE - 1 + NR_TASKLETS) / NR_TASKLETS)
 
-/**
- * @def MAX_REQUESTED_WORDS
- * @brief the maximum number of words that can contribute to a request
- *
- */
-#define MAX_REQUESTED_WORDS 5
-
-/**
- * @def MAX_ITEM
- * @brief the maximum number of responses sent by a tasklet (forgets any further response)
- *
- */
-#define MAX_RESPONSES  (1024/MAX_REQUEST_NUM)
 
 /**
  * @typedef algo_request
@@ -44,8 +33,8 @@ typedef struct  {
  * @var args list of words processed by the request
  */
 typedef struct algo_request {
-    uint32_t nr_words;
-    uint32_t args[MAX_REQUESTED_WORDS];
+    uint32_t r_num; 
+    uint32_t s_num;
 } algo_request_t;
 #define DPU_REQUEST_VAR request
 
@@ -57,33 +46,8 @@ typedef struct algo_request {
  */
 typedef struct algo_stats {
     uint64_t exec_time;
-    uint32_t total_results;
-    uint32_t nb_results[MAX_REQUEST_NUM];
-#ifdef STATS_ON
-    uint32_t nb_match;
-    uint32_t nb_bytes_read;
-    uint32_t nb_bytes_written;
-    uint64_t matching_time;
-#endif
+    uint32_t nb_results[NR_TASKLETS];
 } algo_stats_t;
 #define DPU_STATS_VAR stat
-
-/**
- * @typedef tasklet_response
- * @brief structure of a response sent by one tasklet
- * @var nr_items how many items in this response
- * @var items a table of nr_items responses
- */
-typedef struct response {
-    uint32_t did;
-    uint32_t pos;
-} response_t;
-#define DPU_RESPONSES_VAR responses
-
-/**
- * @def NR_SEGMENTS_PER_MRAM
- * @brief The number of segment used to generate the MRAM files
- */
-#define NR_SEGMENTS_PER_MRAM (16)
 
 #endif // REQUEST_H
