@@ -65,11 +65,19 @@ void merge(__mram_ptr tuple_t *a, int left, int mid, int right, __mram_ptr tuple
 		}
 	}
 
-	while (i < mid)
-		tmp[k++] = a[i++];
+	while (i < mid) {
+		tuple_t ai;
+		mram_read(&a[i], &ai, sizeof(tuple_t));
+		tmp[k++] = ai;
+		i++;
+	}
 
-	while (j < right)
-		tmp[k++] = a[j++];
+	while (j < right) {
+		tuple_t aj;
+		mram_read(&a[j], &aj, sizeof(tuple_t));
+		tmp[k++] = aj;
+		j++;
+	}
 
 //	memcpy(a + left, tmp + left, sizeof(tuple_t) * (right - left));
 }
@@ -114,9 +122,12 @@ int merge_join(__mram_ptr tuple_t *tuplesR, __mram_ptr tuple_t *tuplesS, int num
 	int i = 0, j = 0, matches = 0;
 
 	while (i < numR && j < numS) {
-		if (tuplesR[i].key < tuplesS[j].key)
+		tuple_t ai, aj;
+		mram_read(&tuplesR[i], &ai, sizeof(tuple_t));
+		mram_read(&tuplesS[j], &aj, sizeof(tuple_t));
+		if (ai.key < aj.key)
 			i++;
-		else if (tuplesR[i].key > tuplesS[j].key)
+		else if (ai.key > aj.key)
 			j++;
 		else {
 			matches++;
