@@ -80,7 +80,7 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
     return DPU_OK;
 }
 
-static void print_response_from_dpus(struct dpu_set_t dpu_set, response_t *responses, algo_stats_t *stats)
+static void print_response_from_dpus(struct dpu_set_t dpu_set, algo_stats_t *stats)
 {
     __attribute__((unused)) struct dpu_set_t dpu;
     unsigned int each_dpu;
@@ -88,7 +88,7 @@ static void print_response_from_dpus(struct dpu_set_t dpu_set, response_t *respo
 	uint32_t nb_results = 0;
 	for (uint32_t i = 0; i < NR_TASKLETS; i++) {
 	    nb_results += stats[each_dpu].nb_results[i];
-            printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_reaults[i]);
+            printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_results[i]);
 	}
         
 	printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
@@ -99,7 +99,6 @@ struct get_response_from_dpus_context {
     uint64_t *dpu_slowest;
     double *dpu_average;
     double *rank_average;
-    response_t *responses;
     algo_stats_t *stats;
     uint32_t *dpu_offset;
 };
@@ -109,7 +108,6 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
     struct get_response_from_dpus_context *ctx = (struct get_response_from_dpus_context *)args;
     uint32_t *dpu_offset = ctx->dpu_offset;
     algo_stats_t *stats = ctx->stats;
-    response_t *responses = ctx->responses;
     uint64_t *slowest = &ctx->dpu_slowest[rank_id];
     double *average = &ctx->dpu_average[rank_id];
     double *rank_average = &ctx->rank_average[rank_id];
@@ -117,7 +115,7 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
     uint64_t slowest_dpu_in_rank_time = 0;
     double average_dpu_time = *average;
     unsigned int each_dpu;
-    struct dpu_set_t dpu;
+    __attribute__((unused)) struct dpu_set_t dpu;
 
     DPU_FOREACH (rank, dpu, each_dpu) {
         uint32_t this_dpu = each_dpu + dpu_offset[rank_id];
@@ -218,15 +216,15 @@ __attribute__((noinline)) void compute_loop(
 }
 
 
-void init_tuples(tuple_t *a, int size) {
-	for (int i = 0; i < size; i++) {
+void init_tuples(tuple_t *a, uint32_t size) {
+	for (uint32_t i = 0; i < size; i++) {
 		a[i].key = i + 1;
 		//a[i].value = i + 1;
 	}
 }
 
-void shuffle_tuples(tuple_t *a, int size) {
-	for (int i = 0; i < size; i++) {
+void shuffle_tuples(tuple_t *a, uint32_t size) {
+	for (uint32_t i = 0; i < size; i++) {
 		int j = rand() % size;
 		tuple_t tmp = a[i];
 		a[i] = a[j];
@@ -234,27 +232,28 @@ void shuffle_tuples(tuple_t *a, int size) {
 	}
 }
 
-void generate_dataset1(tuple_t *a, int size) {
+void generate_dataset1(tuple_t *a, uint32_t size) {
 	init_tuples(a, size);
 	shuffle_tuples(a, size);
 }
 
-void partition_tuples(tuple_t *a, int size, tuple_t *par, uint32_t par_num, uint32_t par_off, uint32_t par_size) {
-    uint32_t offset[par_num] = {0};
+void partition_tuples(tuple_t *a, uint32_t size, tuple_t *par, uint32_t par_num, uint32_t par_off, uint32_t par_size) {
+    uint32_t offset[par_num];
+    memset(offset, 0, sizeof(offset));
     for (uint32_t i = 0; i < par_num; i++) {
         offset[i] = par_off + i * par_size;
     }
 
     for (uint32_t i = 0; i < size; i++) {
         uint32_t par_id = a[i].key % par_num;
-	assert(offset[par_id] < par_size);
+	assert(offset[par_id] - par_off < par_size);
 	par[offset[par_id]] = a[i];
 	offset[par_id]++;
     }
 }
 
 static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, algo_request_t *request, uint32_t nb_mram,
-    uint32_t nb_loop, char *mram_path, bool load_mram)
+    uint32_t nb_loop, bool load_mram)
 {
     // Set dpu_offset
     uint32_t dpu_offset[nr_ranks];
@@ -277,7 +276,7 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     tuple_t *s = malloc(size);
     assert(s != NULL);
 
-    printf("dpu count: %u, tpules size: %u, tuples memory: %f MB\n", nb_mram, TUPLES_NUM, (float)size / 1024 / 1024);
+    printf("dpu count: %u, tpules size: %u, tuples memory: %f MB\n", nb_mram, (uint32_t)TUPLES_NUM, (float)size / 1024 / 1024);
 
     generate_dataset1(r, nb_mram * TUPLES_NUM);
     generate_dataset1(s, nb_mram * TUPLES_NUM);
@@ -298,7 +297,6 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     }
 
     printf("Initializing buffers\n");
-    response_t responses[nb_mram * MAX_RESPONSES];
     algo_stats_t stats[nb_mram];
     uint64_t dpu_slowest[nr_ranks];
     double dpu_average[nr_ranks];
@@ -311,7 +309,6 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     struct get_response_from_dpus_context response_ctx = { .dpu_slowest = dpu_slowest,
         .dpu_average = dpu_average,
         .rank_average = rank_average,
-        .responses = responses,
         .stats = stats,
         .dpu_offset = dpu_offset };
     compute_loop(dpu_set, nb_loop, &response_ctx, request);
@@ -325,7 +322,7 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
             dpu_slowest_total = dpu_slowest[each_rank];
     }
 
-    print_response_from_dpus(dpu_set, responses, stats);
+    print_response_from_dpus(dpu_set, stats);
 
     print_dpu("slowest execution time      ", dpu_slowest_total);
     print_dpu("average dpu execution time  ", dpu_average_total / (nb_mram * nb_loop));
@@ -355,7 +352,7 @@ int main(int argc, char **argv)
     DPU_ASSERT(dpu_load_from_incbin(dpu_set, &dpu_binary, NULL));
     DPU_ASSERT(dpu_get_nr_ranks(dpu_set, &nr_ranks));
 
-    allocated_and_compute(dpu_set, nr_ranks, &request, nb_mram, nb_loop, mram_path, load_mram);
+    allocated_and_compute(dpu_set, nr_ranks, &request, nb_mram, nb_loop, load_mram);
 
     DPU_ASSERT(dpu_free(dpu_set));
 

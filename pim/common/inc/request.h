@@ -12,12 +12,12 @@
 
 #include <stdint.h>
 
-typedef uint32_t key_t;
-typedef uint32_t value_t;
+typedef uint32_t tuple_key_t;
+typedef uint32_t tuple_value_t;
 
 typedef struct  {
-	key_t   key;
-	value_t value;
+	tuple_key_t   key;
+	tuple_value_t value;
 } tuple_t;
 
 #define MRAM_SIZE (20 << 20) // 20MB

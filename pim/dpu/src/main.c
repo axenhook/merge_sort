@@ -57,10 +57,12 @@ void merge(__mram_ptr tuple_t *a, int left, int mid, int right, __mram_ptr tuple
 		mram_read(&a[i], &ai, sizeof(tuple_t));
 		mram_read(&a[j], &aj, sizeof(tuple_t));
 		if (ai.key < aj.key) {
-			tmp[k++] = ai;
+			mram_write(&ai, &tmp[k], sizeof(tuple_t));
+			k++;
 			i++;
 		} else {
-			tmp[k++] = aj;
+			mram_write(&aj, &tmp[k], sizeof(tuple_t));
+			k++;
 			j++;
 		}
 	}
@@ -68,14 +70,16 @@ void merge(__mram_ptr tuple_t *a, int left, int mid, int right, __mram_ptr tuple
 	while (i < mid) {
 		tuple_t ai;
 		mram_read(&a[i], &ai, sizeof(tuple_t));
-		tmp[k++] = ai;
+		mram_write(&ai, &tmp[k], sizeof(tuple_t));
+		k++;
 		i++;
 	}
 
 	while (j < right) {
 		tuple_t aj;
 		mram_read(&a[j], &aj, sizeof(tuple_t));
-		tmp[k++] = aj;
+		mram_write(&aj, &tmp[k], sizeof(tuple_t));
+		k++;
 		j++;
 	}
 
