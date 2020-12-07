@@ -29,7 +29,7 @@ clean:
 ###
 ### HOST APPLICATION
 ###
-CFLAGS=-g -Wall -Werror -Wextra -O0 -std=c11 `dpu-pkg-config --cflags dpu` -Ihost/inc -Icommon/inc -DNR_TASKLETS=${NR_TASKLETS}
+CFLAGS=-g -Wall -Werror -Wextra -O3 -std=c11 `dpu-pkg-config --cflags dpu` -Ihost/inc -Icommon/inc -DNR_TASKLETS=${NR_TASKLETS}
 LDFLAGS=`dpu-pkg-config --libs dpu` -fopenmp
 
 ${HOST_BINARY}: ${HOST_SOURCES} ${HOST_HEADERS} ${COMMONS_HEADERS} ${DPU_BINARY}

@@ -190,7 +190,7 @@ static void parse_args(int argc, char **argv, unsigned int *nb_mram, unsigned in
 __attribute__((noinline)) void compute_once(
     struct dpu_set_t dpu_set, struct get_response_from_dpus_context *ctx, algo_request_t *request)
 {
-    DPU_ASSERT(dpu_broadcast_to(dpu_set, STR(DPU_REQUEST_VAR), 0, (void *)request, sizeof(algo_request_t) * MAX_REQUEST_NUM, DPU_XFER_ASYNC));
+    DPU_ASSERT(dpu_broadcast_to(dpu_set, STR(DPU_REQUEST_VAR), 0, (void *)request, sizeof(algo_request_t), DPU_XFER_ASYNC));
     DPU_ASSERT(dpu_launch(dpu_set, DPU_ASYNCHRONOUS));
     struct dpu_set_t dpu, rank;
     uint32_t each_dpu, each_rank;
@@ -298,7 +298,7 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     }
 
     printf("Initializing buffers\n");
-    response_t responses[nb_mram * MAX_RESPONSES * MAX_REQUEST_NUM];
+    response_t responses[nb_mram * MAX_RESPONSES];
     algo_stats_t stats[nb_mram];
     uint64_t dpu_slowest[nr_ranks];
     double dpu_average[nr_ranks];
@@ -332,16 +332,6 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     print_dpu("average rank execution time ", rank_average_total / (nr_ranks * nb_loop));
 }
 
-void init_request(algo_request_t * request, uint32_t req_num)
-{
-    uint32_t args[MAX_REQUESTED_WORDS] = {0, 1, 2, 3, 4};
-    for (uint32_t i = 0; i < req_num; i++) {
-    	request[i].nr_words = 5;
-	memcpy(request[i].args, args, sizeof(args));
-    }
-//    request[req_num - 1].nr_words = 5;
-}
-
 /**
  * @brief Main of the Host Application.
  *
@@ -365,7 +355,7 @@ int main(int argc, char **argv)
     DPU_ASSERT(dpu_load_from_incbin(dpu_set, &dpu_binary, NULL));
     DPU_ASSERT(dpu_get_nr_ranks(dpu_set, &nr_ranks));
 
-    allocated_and_compute(dpu_set, nr_ranks, request, nb_mram, nb_loop, mram_path, load_mram);
+    allocated_and_compute(dpu_set, nr_ranks, &request, nb_mram, nb_loop, mram_path, load_mram);
 
     DPU_ASSERT(dpu_free(dpu_set));
 
