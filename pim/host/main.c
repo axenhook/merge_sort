@@ -241,14 +241,14 @@ void partition_tuples(tuple_t *a, uint32_t size, tuple_t *par, uint32_t par_num,
     uint32_t offset[par_num];
     memset(offset, 0, sizeof(offset));
     for (uint32_t i = 0; i < par_num; i++) {
-        offset[i] = par_off + i * par_size;
+        offset[i] = par_off + i * par_size * 2;
     }
 
     for (uint32_t i = 0; i < size; i++) {
         uint32_t par_id = a[i].key % par_num;
-	assert(offset[par_id] - par_off < par_size);
 	par[offset[par_id]] = a[i];
 	offset[par_id]++;
+	//assert(offset[par_id] % par_size != 0);
     }
 }
 
@@ -284,8 +284,8 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     tuple_t *par = malloc(nb_mram * MRAM_SIZE * 2);
     assert(par != NULL);
 
-    partition_tuples(r, nb_mram * TUPLES_NUM, par, nb_mram, 0, TUPLES_NUM);
-    partition_tuples(s, nb_mram * TUPLES_NUM, par, nb_mram, TUPLES_NUM, TUPLES_NUM);
+    partition_tuples(r, nb_mram * TUPLES_NUM, par, nb_mram * NR_TASKLETS, 0, TUPLES_NUM / NR_TASKLETS);
+    partition_tuples(s, nb_mram * TUPLES_NUM, par, nb_mram * NR_TASKLETS, TUPLES_NUM / NR_TASKLETS, TUPLES_NUM / NR_TASKLETS);
 
     if (load_mram) {
         printf("Preparing %u MRAMs: loading files\n", nb_mram);
