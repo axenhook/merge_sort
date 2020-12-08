@@ -163,22 +163,28 @@ int main(int argc, char *argv[]) {
 	tuple_t *a = malloc(size * sizeof(tuple_t));
 	assert(a != NULL);
 
+	tuple_t *b = malloc(size * sizeof(tuple_t));
+	assert(b != NULL);
+
 	printf("tuples size: %d, tuples memory: %f MB\n", size, (float)size * sizeof(tuple_t) / 1024 / 1024);
 
 	generate_dataset1(a, size);
+	generate_dataset1(b, size);
 	print_tuples(a, size);
 
 	tuple_t *tmp = malloc(size * sizeof(tuple_t));
 	assert(tmp != NULL);
 	memset(tmp, 0, size * sizeof(tuple_t));
 
-	printf("begin merge sort\n");
+	printf("begin merge sort and merge join\n");
 
 	clock_t t = clock();
 	//merge_sort(a, 0, size, tmp);
 	merge_sort2(a, size, tmp);
+	merge_sort2(b, size, tmp);
+	int matches = merge_join(a, b, size, size, tmp);
 	t = clock() - t;
-	printf("time: %f ms\n", (float)t * 1000 / CLOCKS_PER_SEC);
+	printf("time: %f ms, matches: %d\n", (float)t * 1000 / CLOCKS_PER_SEC, matches);
 
 	print_tuples(a, size);
 	assert(check_tuples_sorted(a, size));
