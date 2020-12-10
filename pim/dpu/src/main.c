@@ -96,6 +96,78 @@ void *get_member(cache_mgr_t *mgr, uint32_t pos) {
     uint32_t begin_pos = pos & ~mgr->pos_mask;
 
     //hit
+    if (mgr->cache.begin_pos == begin_pos) {
+        if (mgr->cache.pos != pos)
+            mgr->cache.pos = pos;
+
+        mgr->cache.cnt++;
+        return &mgr->cache.buffer[(pos & mgr->pos_mask) << mgr->pos_shift];
+    }
+
+    // first use
+    if (mgr->cache.begin_pos == INVALID_POS) {
+        if (mgr->is_rd_cache)
+            memcpy(mgr->cache.buffer, &mgr->memory[begin_pos << mgr->pos_shift], CACHE_SIZE);
+
+        mgr->cache.begin_pos = begin_pos;
+        mgr->cache.pos = pos;
+        mgr->cache.cnt = 1;
+
+        return &mgr->cache.buffer[(pos & mgr->pos_mask) << mgr->pos_shift];
+    }
+
+    // reuse
+    // printf("memory: %p, cnt: %u, begin_pos: %u, pos_cache: %u, new_begin_pos: %u, is_rd_cache: %d\n",
+    //        mgr->memory, mgr->cache.cnt, mgr->cache.begin_pos, mgr->cache.pos-mgr->cache.begin_pos, begin_pos, mgr->is_rd_cache);
+
+    if (mgr->is_rd_cache)
+        memcpy(mgr->cache.buffer, &mgr->memory[begin_pos << mgr->pos_shift], CACHE_SIZE);
+    else
+        memcpy(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
+
+    mgr->cache.begin_pos = begin_pos;
+    mgr->cache.pos = pos;
+    mgr->cache.cnt = 1;
+
+    return &mgr->cache.buffer[(pos & mgr->pos_mask) << mgr->pos_shift];
+}
+
+void merge(cache_mgr_t *a, cache_mgr_t *b, uint32_t left, uint32_t mid, uint32_t right, cache_mgr_t *tmp) {
+    uint32_t i = left;
+    uint32_t j = mid;
+    uint32_t k = left;
+    tuple_t *ai, *aj, *tmpk;
+
+    while (i < mid && j < right) {
+        ai = get_member(a, i);
+        aj = get_member(b, j);
+        tmpk = get_member(tmp, k);
+        if (ai->key < aj->key) {
+            *tmpk = *ai;
+            i++;
+            k++;
+        }
+        else {
+            *tmpk = *aj;
+            j++;
+            k++;
+        }
+    }
+
+    while (i < mid) {
+        ai = get_member(a, i++);
+        tmpk = get_member(tmp, k++);
+        *tmpk = *ai;
+    }
+
+    while (j < right) {
+        aj = get_member(b, j++);
+        tmpk = get_member(tmp, k++);
+        *tmpk = *aj;
+    }
+}
+
+// non-recursive
 void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
     if (len <= 1)
         return;
