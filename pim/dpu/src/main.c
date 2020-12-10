@@ -16,54 +16,86 @@ STDOUT_BUFFER_INIT(256);
 BARRIER_INIT(barrier, NR_TASKLETS);
 MUTEX_INIT(mutex_responses);
 
-#define TUPLES_NUM_IN_CACHE (1024/sizeof(tuple_t))
-__dma_aligned tuple_t tuples_cache[TUPLES_NUM_IN_CACHE];
-
 __host algo_request_t DPU_REQUEST_VAR;
 __host algo_stats_t DPU_STATS_VAR;
 
 uintptr_t data_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER;
 uintptr_t tmp_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER + MRAM_SIZE + MRAM_SIZE;
 
-void merge(__mram_ptr tuple_t *a, uint32_t left, uint32_t mid, uint32_t right, __mram_ptr tuple_t *tmp) {
-    uint32_t i = left;
-    uint32_t j = mid;
-    uint32_t k = left;
+#define CACHE_SIZE       1024
+#define CACHE_SIZE_SHIFT 10
+#define TUPLES_PER_CACHE ((uint32_t)(CACHE_SIZE / sizeof(tuple_t)))
+#define INVALID_POS      ((uint32_t)-1)
+#define POS_SHIFT        3 // log2(sizeof(tuple_t))
 
-    while (i < mid && j < right) {
-        tuple_t ai, aj;
-        mram_read(&a[i], &ai, sizeof(tuple_t));
-        mram_read(&a[j], &aj, sizeof(tuple_t));
-        if (ai.key < aj.key) {
-            mram_write(&ai, &tmp[k], sizeof(tuple_t));
-            k++;
-            i++;
-        } else {
-            mram_write(&aj, &tmp[k], sizeof(tuple_t));
-            k++;
-            j++;
-        }
-    }
+typedef struct {
+    char *buffer;
+    uint32_t cnt;
+    uint32_t begin_pos;
+    uint32_t pos;
+} cache_t;
 
-    while (i < mid) {
-        tuple_t ai;
-        mram_read(&a[i], &ai, sizeof(tuple_t));
-        mram_write(&ai, &tmp[k], sizeof(tuple_t));
-        k++;
-        i++;
-    }
+typedef struct {
+    cache_t cache;
+    uint32_t pos_mask;
+    uint32_t pos_shift;
+    bool     is_rd_cache;
+    uint32_t memory_size;
+    __mram_ptr char    *memory;
+} cache_mgr_t;
 
-    while (j < right) {
-        tuple_t aj;
-        mram_read(&a[j], &aj, sizeof(tuple_t));
-        mram_write(&aj, &tmp[k], sizeof(tuple_t));
-        k++;
-        j++;
-    }
+cache_mgr_t cache[3];
 
-//  memcpy(a + left, tmp + left, sizeof(tuple_t) * (right - left));
+void init_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {
+    assert(memory_size % CACHE_SIZE == 0);
+
+    memset(mgr, 0, sizeof(cache_mgr_t));
+    
+    mgr->pos_mask = TUPLES_PER_CACHE - 1;
+    assert((mgr->pos_mask & TUPLES_PER_CACHE) == 0);
+
+    mgr->pos_shift = __log2(sizeof(tuple_t));
+    mgr->memory_size = memory_size;
+    mgr->is_rd_cache = is_rd_cache;
+    mgr->memory = memory;
+
+    mgr->cache.buffer = malloc(CACHE_SIZE);
+    assert(mgr->cache.buffer != NULL);
+
+    mgr->cache.pos = INVALID_POS;
+    mgr->cache.begin_pos = INVALID_POS;
+    mgr->cache.cnt = 0;
+
+    printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, memory_size: %u\n",
+           mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
 }
 
+void reset_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {
+    assert(memory_size % CACHE_SIZE == 0);
+
+    mgr->memory_size = memory_size;
+    mgr->is_rd_cache = is_rd_cache;
+    mgr->memory = memory;  // maybe new memory
+
+    mgr->cache.pos = INVALID_POS;
+    mgr->cache.begin_pos = INVALID_POS;
+    mgr->cache.cnt = 0;
+}
+
+void flush_cache(cache_mgr_t *mgr) {
+    if (mgr->is_rd_cache)
+        return;
+
+    if (mgr->cache.cnt) {
+        //printf("flush: memory: %p, cnt: %u, pos: %u\n", mgr->memory, mgr->cache.cnt, mgr->cache.begin_pos);
+        memcpy(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
+    }
+}
+
+void *get_member(cache_mgr_t *mgr, uint32_t pos) {
+    uint32_t begin_pos = pos & ~mgr->pos_mask;
+
+    //hit
 void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
     if (len <= 1)
         return;
