@@ -129,7 +129,7 @@ void *get_member(cache_mgr_t *mgr, uint32_t pos) {
     if (mgr->is_rd_cache)
         memcpy(mgr->cache.buffer, &mgr->memory[begin_pos << mgr->pos_shift], CACHE_SIZE);
     else
-        memcpy(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], &mgr->cache.buffer, CACHE_SIZE);
+        memcpy(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
 
     mgr->cache.begin_pos = begin_pos;
     mgr->cache.pos = pos;
@@ -167,9 +167,9 @@ void merge(cache_mgr_t *a, cache_mgr_t *b, uint32_t left, uint32_t mid, uint32_t
     }
 
     while (j < right) {
-        aj = get_member(a, j++);
+        aj = get_member(b, j++);
         tmpk = get_member(tmp, k++);
-        *tmpk = *ai;
+        *tmpk = *aj;
     }
 }
 
@@ -350,7 +350,7 @@ int main(int argc, char *argv[]) {
 
     init_cache(&cache[0], a, size * sizeof(tuple_t), true);
     init_cache(&cache[1], b, size * sizeof(tuple_t), true);
-    init_cache(&cache[2], tmp, size * sizeof(tuple_t), true);
+    init_cache(&cache[2], tmp, size * sizeof(tuple_t), false);
 
     clock_t t = clock();
 
