@@ -57,7 +57,7 @@ static inline void merge_sort(tuple_t *a, uint32_t len, tuple_t *tmp) {
 #else
 
 // non-recursive
-void merge_sort2(tuple_t *a, uint32_t len, tuple_t *tmp) {
+void merge_sort(tuple_t *a, uint32_t len, tuple_t *tmp) {
     if (len <= 1)
         return;
 
@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
     uint32_t matches = merge_join(a, b, size, size, tmp);
 
     t = clock() - t;
-    printf("time: %f ms, matches: %d\n", (float)t * 1000 / CLOCKS_PER_SEC, matches);
+    printf("time: %f ms, matches: %u\n", (float)t * 1000 / CLOCKS_PER_SEC, matches);
 
     print_tuples(a, size);
     assert(is_tuples_sorted(a, size));
