@@ -46,7 +46,7 @@ typedef struct {
 
 cache_mgr_t cache[3];
 
-void init_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {
+void init_cache(cache_mgr_t *mgr, __mram_ptr void *memory, uint32_t memory_size, bool is_rd_cache) {
     assert(memory_size % CACHE_SIZE == 0);
 
     memset(mgr, 0, sizeof(cache_mgr_t));
@@ -54,12 +54,12 @@ void init_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd
     mgr->pos_mask = TUPLES_PER_CACHE - 1;
     assert((mgr->pos_mask & TUPLES_PER_CACHE) == 0);
 
-    mgr->pos_shift = __log2(sizeof(tuple_t));
+    mgr->pos_shift = POS_SHIFT;
     mgr->memory_size = memory_size;
     mgr->is_rd_cache = is_rd_cache;
     mgr->memory = memory;
 
-    mgr->cache.buffer = malloc(CACHE_SIZE);
+    mgr->cache.buffer = mem_alloc(CACHE_SIZE); // WRAM alloc
     assert(mgr->cache.buffer != NULL);
 
     mgr->cache.pos = INVALID_POS;
@@ -70,7 +70,7 @@ void init_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd
            mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
 }
 
-void reset_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {
+void reset_cache(cache_mgr_t *mgr, __mram_ptr void *memory, uint32_t memory_size, bool is_rd_cache) {
     assert(memory_size % CACHE_SIZE == 0);
 
     mgr->memory_size = memory_size;
@@ -88,7 +88,7 @@ void flush_cache(cache_mgr_t *mgr) {
 
     if (mgr->cache.cnt) {
         //printf("flush: memory: %p, cnt: %u, pos: %u\n", mgr->memory, mgr->cache.cnt, mgr->cache.begin_pos);
-        memcpy(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
+        mram_write(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
     }
 }
 
@@ -121,9 +121,9 @@ void *get_member(cache_mgr_t *mgr, uint32_t pos) {
     //        mgr->memory, mgr->cache.cnt, mgr->cache.begin_pos, mgr->cache.pos-mgr->cache.begin_pos, begin_pos, mgr->is_rd_cache);
 
     if (mgr->is_rd_cache)
-        memcpy(mgr->cache.buffer, &mgr->memory[begin_pos << mgr->pos_shift], CACHE_SIZE);
+        mram_read(mgr->cache.buffer, &mgr->memory[begin_pos << mgr->pos_shift], CACHE_SIZE);
     else
-        memcpy(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
+        mram_write(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
 
     mgr->cache.begin_pos = begin_pos;
     mgr->cache.pos = pos;
@@ -173,15 +173,20 @@ void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
         return;
 
     uint32_t toggle = 0;
-    __mram_ptr tuple_t *src, *dst;
+    cache_mgr_t tuple_t *srca, *srcb, *dst;
+    srca = &cache[0];
+    srcb = &cache[1];
+    dst = &cache[2];
     for (uint32_t width = 1; width < len; width <<= 1) {
         if (toggle & 1) {
-            src = tmp;
-            dst = a;
+            reset_cache(srca, tmp, len * sizeof(tuple_t), true);
+            reset_cache(srcb, tmp, len * sizeof(tuple_t), true);
+            reset_cache(dst, a, len * sizeof(tuple_t), false);
         }
         else {
-            src = a;
-            dst = tmp;
+            reset_cache(srca, a, len * sizeof(tuple_t), true);
+            reset_cache(srcb, a, len * sizeof(tuple_t), true);
+            reset_cache(dst, tmp, len * sizeof(tuple_t), false);
         }
         //clock_t t = clock();
         for (uint32_t i = 0; i < len; i += (width << 1)) {
@@ -193,10 +198,11 @@ void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
             if (right > len)
                 right = len;
 
-            merge(src, i, mid, right, dst);
+            merge(srca, srcb, i, mid, right, dst);
         }
         //t = clock() - t;
         //printf("width: %d, time: %f ms\n", width, (float)t * 1000 / CLOCKS_PER_SEC);
+        flush_cache(dst);
         toggle++;
     }
 
@@ -204,16 +210,16 @@ void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
         memcpy(a, tmp, len * sizeof(tuple_t));
 }
 
-uint32_t merge_join(__mram_ptr tuple_t *tuplesR, __mram_ptr tuple_t *tuplesS, uint32_t numR, uint32_t numS) {//, void *output) {
+uint32_t merge_join(cache_mgr_t *r, cache_mgr_t *s, uint32_t num_r, uint32_t num_s) {//, void *output) {
     uint32_t i = 0, j = 0, matches = 0;
+    tuple_t *ri, *sj;
 
-    while (i < numR && j < numS) {
-        tuple_t ai, aj;
-        mram_read(&tuplesR[i], &ai, sizeof(tuple_t));
-        mram_read(&tuplesS[j], &aj, sizeof(tuple_t));
-        if (ai.key < aj.key)
+    while (i < num_r && j < num_s) {
+        ri = get_member(r, i);
+        sj = get_member(s, j);
+        if (ri->key < sj->key)
             i++;
-        else if (ai.key > aj.key)
+        else if (ri->key > sj->key)
             j++;
         else {
             matches++;
@@ -239,11 +245,17 @@ int main()
     uintptr_t r_data = data_begin + data_offset;
     uintptr_t s_data = r_data + MRAM_SIZE_PER_TASKLET;
 
+    init_cache(&cache[0], (__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
+    init_cache(&cache[1], (__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
+    init_cache(&cache[2], (__mram_ptr void *)(tmp_begin + tmp_offset), TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), false);
+
     merge_sort((__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
     merge_sort((__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
 
-    uint32_t matches = merge_join((__mram_ptr void *)r_data, (__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET, TUPLES_NUM_PER_TASKLET);
+    reset_cache(&cache[0], (__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
+    reset_cache(&cache[1], (__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
 
+    uint32_t matches = merge_join(&cache[0], &cache[1], TUPLES_NUM_PER_TASKLET, TUPLES_NUM_PER_TASKLET);
 
     DPU_STATS_VAR.nb_results[me()] = matches;
     DPU_STATS_VAR.exec_time = perfcounter_get();
