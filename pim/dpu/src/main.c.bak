@@ -16,9 +16,6 @@ STDOUT_BUFFER_INIT(256);
 BARRIER_INIT(barrier, NR_TASKLETS);
 MUTEX_INIT(mutex_responses);
 
-#define TUPLES_NUM_IN_CACHE (1024/sizeof(tuple_t))
-__dma_aligned tuple_t tuples_cache[TUPLES_NUM_IN_CACHE];
-
 __host algo_request_t DPU_REQUEST_VAR;
 __host algo_stats_t DPU_STATS_VAR;
 
@@ -100,13 +97,13 @@ void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
         memcpy(a, tmp, len * sizeof(tuple_t));
 }
 
-uint32_t merge_join(__mram_ptr tuple_t *tuplesR, __mram_ptr tuple_t *tuplesS, uint32_t numR, uint32_t numS) {//, void *output) {
+uint32_t merge_join(__mram_ptr tuple_t *r, __mram_ptr tuple_t *s, uint32_t num_r, uint32_t num_s) {//, void *output) {
     uint32_t i = 0, j = 0, matches = 0;
 
-    while (i < numR && j < numS) {
+    while (i < num_r && j < num_s) {
         tuple_t ai, aj;
-        mram_read(&tuplesR[i], &ai, sizeof(tuple_t));
-        mram_read(&tuplesS[j], &aj, sizeof(tuple_t));
+        mram_read(&r[i], &ai, sizeof(tuple_t));
+        mram_read(&s[j], &aj, sizeof(tuple_t));
         if (ai.key < aj.key)
             i++;
         else if (ai.key > aj.key)

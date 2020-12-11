@@ -47,12 +47,12 @@ typedef struct {
 cache_mgr_t cache[3];
 
 void init_cache(cache_mgr_t *mgr, __mram_ptr void *memory, uint32_t memory_size, bool is_rd_cache) {
-    assert(memory_size % CACHE_SIZE == 0);
+    //assert(memory_size % CACHE_SIZE == 0);
 
     memset(mgr, 0, sizeof(cache_mgr_t));
     
     mgr->pos_mask = TUPLES_PER_CACHE - 1;
-    assert((mgr->pos_mask & TUPLES_PER_CACHE) == 0);
+    //assert((mgr->pos_mask & TUPLES_PER_CACHE) == 0);
 
     mgr->pos_shift = POS_SHIFT;
     mgr->memory_size = memory_size;
@@ -60,18 +60,18 @@ void init_cache(cache_mgr_t *mgr, __mram_ptr void *memory, uint32_t memory_size,
     mgr->memory = memory;
 
     mgr->cache.buffer = mem_alloc(CACHE_SIZE); // WRAM alloc
-    assert(mgr->cache.buffer != NULL);
+    //assert(mgr->cache.buffer != NULL);
 
     mgr->cache.pos = INVALID_POS;
     mgr->cache.begin_pos = INVALID_POS;
     mgr->cache.cnt = 0;
 
-    printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, memory_size: %u\n",
-           mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
+    //printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, memory_size: %u\n",
+      //     mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
 }
 
 void reset_cache(cache_mgr_t *mgr, __mram_ptr void *memory, uint32_t memory_size, bool is_rd_cache) {
-    assert(memory_size % CACHE_SIZE == 0);
+    //assert(memory_size % CACHE_SIZE == 0);
 
     mgr->memory_size = memory_size;
     mgr->is_rd_cache = is_rd_cache;
@@ -88,7 +88,7 @@ void flush_cache(cache_mgr_t *mgr) {
 
     if (mgr->cache.cnt) {
         //printf("flush: memory: %p, cnt: %u, pos: %u\n", mgr->memory, mgr->cache.cnt, mgr->cache.begin_pos);
-        mram_write(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
+        mram_write(mgr->cache.buffer, &mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], CACHE_SIZE);
     }
 }
 
@@ -121,9 +121,9 @@ void *get_member(cache_mgr_t *mgr, uint32_t pos) {
     //        mgr->memory, mgr->cache.cnt, mgr->cache.begin_pos, mgr->cache.pos-mgr->cache.begin_pos, begin_pos, mgr->is_rd_cache);
 
     if (mgr->is_rd_cache)
-        mram_read(mgr->cache.buffer, &mgr->memory[begin_pos << mgr->pos_shift], CACHE_SIZE);
+        mram_read(&mgr->memory[begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
     else
-        mram_write(&mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], mgr->cache.buffer, CACHE_SIZE);
+        mram_write(mgr->cache.buffer, &mgr->memory[mgr->cache.begin_pos << mgr->pos_shift], CACHE_SIZE);
 
     mgr->cache.begin_pos = begin_pos;
     mgr->cache.pos = pos;
@@ -173,7 +173,7 @@ void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
         return;
 
     uint32_t toggle = 0;
-    cache_mgr_t tuple_t *srca, *srcb, *dst;
+    cache_mgr_t *srca, *srcb, *dst;
     srca = &cache[0];
     srcb = &cache[1];
     dst = &cache[2];
