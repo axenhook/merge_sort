@@ -234,7 +234,7 @@ uint32_t tuples_sorted(cache_mgr_t *r0, cache_mgr_t *r1, uint32_t num) {
     tuple_t *t0, *t1;
     for (uint32_t i = 0; i < num - 1; i++) {
         t0 = get_member(r0, i);
-        t1 = get_member(r0, i+1);
+        t1 = get_member(r1, i+1);
         if (t0->key + 1 != t1->key) {
             printf("tasklet:%u, m0: %p, c0: %p, m1: %p, c1: %p\n", me(), r0->memory, r0->cache.buffer, r1->memory, r1->cache.buffer);
             printf("tasklet:%u, i: %u, key: %u.%p, i+1: %u, key: %u.%p\n", me(), i, t0->key, &t0->key, i+1, t1->key, &t1->key);
