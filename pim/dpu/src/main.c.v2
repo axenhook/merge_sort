@@ -23,7 +23,7 @@ __host algo_stats_t DPU_STATS_VAR;
 uintptr_t data_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER;
 uintptr_t tmp_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER + MRAM_SIZE + MRAM_SIZE;
 
-#define CACHE_SIZE       128
+#define CACHE_SIZE       1024
 #define TUPLES_PER_CACHE ((uint32_t)CACHE_SIZE / sizeof(tuple_t))
 #define INVALID_POS      ((uint32_t)-1)
 #define POS_SHIFT        3 // log2(sizeof(tuple_t))
