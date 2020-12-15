@@ -248,9 +248,9 @@ void partition_tuples(tuple_t *a, uint32_t size, tuple_t *par, uint32_t par_num,
 
     for (uint32_t i = 0; i < size; i++) {
         uint32_t par_id = a[i].key % par_num;
-    par[offset[par_id]] = a[i];
-    offset[par_id]++;
-    //assert(offset[par_id] % par_size != 0);
+        par[offset[par_id]] = a[i];
+        offset[par_id]++;
+        //assert(offset[par_id] % par_size != 0);
     }
 }
 
