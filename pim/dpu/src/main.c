@@ -23,12 +23,10 @@ __host algo_stats_t DPU_STATS_VAR;
 uintptr_t data_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER;
 uintptr_t tmp_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER + MRAM_SIZE + MRAM_SIZE;
 
-#define CACHE_SIZE       256
+#define CACHE_SIZE       1024
 #define TUPLES_PER_CACHE ((uint32_t)CACHE_SIZE / sizeof(tuple_t))
 #define INVALID_POS      ((uint32_t)-1)
 #define POS_SHIFT        3 // log2(sizeof(tuple_t))
-
-//__dma_aligned char buffer[NR_TASKLETS][3][CACHE_SIZE];
 
 typedef struct {
     char *buffer;
@@ -62,8 +60,6 @@ void init_cache(cache_mgr_t *mgr, __mram_ptr void *memory, uint32_t memory_size,
     mgr->memory = memory;
 
     mgr->cache.buffer = mem_alloc(CACHE_SIZE); // WRAM alloc
-    //mgr->cache.buffer = buffer[me()][buffer_id];
-    //printf("tasklet:%u, buffer_id:%u, buffer: %p\n", me(), buffer_id, mgr->cache.buffer);
     //assert(mgr->cache.buffer != NULL);
 
     mgr->cache.pos = INVALID_POS;
@@ -238,7 +234,7 @@ uint32_t tuples_sorted(cache_mgr_t *r0, cache_mgr_t *r1, uint32_t num) {
     tuple_t *t0, *t1;
     for (uint32_t i = 0; i < num - 1; i++) {
         t0 = get_member(r0, i);
-        t1 = get_member(r1, i+1);
+        t1 = get_member(r0, i+1);
         if (t0->key + 1 != t1->key) {
             printf("tasklet:%u, m0: %p, c0: %p, m1: %p, c1: %p\n", me(), r0->memory, r0->cache.buffer, r1->memory, r1->cache.buffer);
             printf("tasklet:%u, i: %u, key: %u.%p, i+1: %u, key: %u.%p\n", me(), i, t0->key, &t0->key, i+1, t1->key, &t1->key);
@@ -268,13 +264,13 @@ int main()
     init_cache(&cache[me()][2], (__mram_ptr void *)(tmp_begin + tmp_offset), TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), false);
 
     merge_sort((__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
-    //merge_sort((__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
+    merge_sort((__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
 
     reset_cache(&cache[me()][0], (__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
-    reset_cache(&cache[me()][1], (__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
+    reset_cache(&cache[me()][1], (__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
 
-    //uint32_t matches = merge_join(&cache[0], &cache[1], TUPLES_NUM_PER_TASKLET, TUPLES_NUM_PER_TASKLET);
-    uint32_t matches = tuples_sorted(&cache[me()][0], &cache[me()][1], TUPLES_NUM_PER_TASKLET);
+    uint32_t matches = merge_join(&cache[me()][0], &cache[me()][1], TUPLES_NUM_PER_TASKLET, TUPLES_NUM_PER_TASKLET);
+    //uint32_t matches = tuples_sorted(&cache[me()][0], &cache[me()][1], TUPLES_NUM_PER_TASKLET);
 
     DPU_STATS_VAR.nb_results[me()] = matches;
     DPU_STATS_VAR.exec_time = perfcounter_get();

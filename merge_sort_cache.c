@@ -18,8 +18,7 @@ typedef struct  {
 } tuple_t;
 
 #define CACHE_SIZE       1024
-#define CACHE_SIZE_SHIFT 10
-#define TUPLES_PER_CACHE ((uint32_t)(CACHE_SIZE / sizeof(tuple_t)))
+#define TUPLES_PER_CACHE ((uint32_t)CACHE_SIZE / sizeof(tuple_t))
 #define INVALID_POS      ((uint32_t)-1)
 
 typedef struct {
