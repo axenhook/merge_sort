@@ -8,13 +8,15 @@
 #include <stdint.h>
 #include <string.h>
 #include "request.h"
+
+//#define SEQREAD_CACHE_SIZE 256
 #include "seqread.h"
 
 #ifdef TRACE
 STDOUT_BUFFER_INIT(256);
 #endif
 
-#define WCACHE_SIZE 256
+#define WCACHE_SIZE 256 
 
 BARRIER_INIT(barrier, NR_TASKLETS);
 MUTEX_INIT(mutex_responses);
