@@ -72,8 +72,8 @@ void init_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd
     mgr->cache.begin_pos = INVALID_POS;
     mgr->cache.cnt = 0;
 
-    printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, memory_size: %u\n",
-           mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
+//    printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, memory_size: %u\n",
+  //         mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
 }
 
 void reset_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {

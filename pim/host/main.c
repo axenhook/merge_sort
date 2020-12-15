@@ -16,6 +16,7 @@
 #include <dpu.h>
 #include <dpu_description.h>
 #include <dpu_management.h>
+#include <dpu_log.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -46,13 +47,13 @@ static inline unsigned long long my_clock(void)
     return ((unsigned long long)t.tv_nsec + (unsigned long long)t.tv_sec * 1e9);
 }
 
-static void print_dpu(const char *msg, long value)
+static void print_dpu(const char *msg, unsigned long long value)
 {
     dpu_description_t desc;
     DPU_ASSERT(dpu_get_profile_description(NULL, &desc));
     double dpu_freq = desc->hw.timings.fck_frequency_in_mhz / desc->hw.timings.clock_division;
     dpu_free_description(desc);
-    printf("[DPU]  %s = %.3g ms (%.3g Mcc, %f MHz)\n", msg, 1.0e3 * ((double)value) / (dpu_freq * 1.0e6), value / 1e6, dpu_freq);
+    printf("[DPU]  %s = %.3g ms (%.3g Mcc, %f MHz, %llu cycles)\n", msg, 1.0e3 * ((double)value) / (dpu_freq * 1.0e6), (double)value / 1e6, dpu_freq, value);
 }
 
 struct load_and_copy_mram_file_into_dpus_context {
@@ -122,6 +123,7 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
         average_dpu_time += stats[this_dpu].exec_time;
         slowest_dpu_time = MAX(stats[this_dpu].exec_time, slowest_dpu_time);
         slowest_dpu_in_rank_time = MAX(stats[this_dpu].exec_time, slowest_dpu_in_rank_time);
+	dpulog_read_for_dpu(dpu.dpu, stdout);
     }
 
     *slowest = slowest_dpu_time;

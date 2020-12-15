@@ -232,14 +232,12 @@ uint32_t merge_join(cache_mgr_t *r, cache_mgr_t *s, uint32_t num_r, uint32_t num
 }
 
 uint32_t tuples_sorted(cache_mgr_t *r0, cache_mgr_t *r1, uint32_t num) {
-    tuple_t *t0, *t1, *t2, *t3;
+    tuple_t *t0, *t1;
     for (uint32_t i = 0; i < num - 1; i++) {
 	t0 = get_member(r0, i);
-	t2 = get_member(r0, i+1);
 	t1 = get_member(r1, i+1);
-	t3 = get_member(r1, i);
         if (t0->key + 1 != t1->key) {
-	    printf("tasklet:%u, i: %u, key: %u.%p,%u, i+1: %u, key: %u.%p,%u\n", me(), i, t0->key, &t0->key, t3->key, i+1, t1->key, &t1->key, t2->key);
+	    printf("tasklet:%u, i: %u, key: %u.%p, i+1: %u, key: %u.%p\n", me(), i, t0->key, &t0->key, i+1, t1->key, &t1->key);
 	    tuple_t ai, aj;
 	    mram_read(&(((__mram_ptr tuple_t *)r0->memory)[i]), &ai, sizeof(tuple_t));
 	    mram_read(&(((__mram_ptr tuple_t *)r0->memory)[i+1]), &aj, sizeof(tuple_t));
@@ -269,7 +267,7 @@ int main()
     init_cache(&cache[1], (__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), true);
     init_cache(&cache[2], (__mram_ptr void *)(tmp_begin + tmp_offset), TUPLES_NUM_PER_TASKLET * sizeof(tuple_t), false);
 
-    //merge_sort((__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
+    merge_sort((__mram_ptr void *)r_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
 
 //    merge_sort((__mram_ptr void *)s_data, TUPLES_NUM_PER_TASKLET, (__mram_ptr void *)(tmp_begin + tmp_offset));
 
