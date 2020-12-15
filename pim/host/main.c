@@ -72,7 +72,7 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
     struct dpu_set_t dpu;
     unsigned int each_dpu;
     DPU_FOREACH (rank, dpu, each_dpu) {
-	uint32_t dpu_id = dpu_offset[rank_id] + each_dpu;
+    uint32_t dpu_id = dpu_offset[rank_id] + each_dpu;
         printf("dpu_id: %u, rank_id: %u, each_dpu: %u\n", dpu_id, rank_id, each_dpu);
         DPU_ASSERT(dpu_prepare_xfer(dpu, &ctx->par[dpu_id * TUPLES_NUM *2]));
     }
@@ -86,13 +86,13 @@ static void print_response_from_dpus(struct dpu_set_t dpu_set, algo_stats_t *sta
     __attribute__((unused)) struct dpu_set_t dpu;
     unsigned int each_dpu;
     DPU_FOREACH (dpu_set, dpu, each_dpu) {
-	uint32_t nb_results = 0;
-	for (uint32_t i = 0; i < NR_TASKLETS; i++) {
-	    nb_results += stats[each_dpu].nb_results[i];
+    uint32_t nb_results = 0;
+    for (uint32_t i = 0; i < NR_TASKLETS; i++) {
+        nb_results += stats[each_dpu].nb_results[i];
             printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_results[i]);
-	}
+    }
         
-	printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
+    printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
     }
 }
 
@@ -123,7 +123,7 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
         average_dpu_time += stats[this_dpu].exec_time;
         slowest_dpu_time = MAX(stats[this_dpu].exec_time, slowest_dpu_time);
         slowest_dpu_in_rank_time = MAX(stats[this_dpu].exec_time, slowest_dpu_in_rank_time);
-	dpulog_read_for_dpu(dpu.dpu, stdout);
+        dpulog_read_for_dpu(dpu.dpu, stdout);
     }
 
     *slowest = slowest_dpu_time;
@@ -210,7 +210,7 @@ __attribute__((noinline)) void compute_loop(
     for (unsigned int each_loop = 0; each_loop < nb_loop; each_loop++) {
   //      unsigned long long t = my_clock();
         compute_once(dpu_set, ctx, request);
-//	printf("loop: %d, time: %llu ns\n", each_loop, my_clock() - t);
+//  printf("loop: %d, time: %llu ns\n", each_loop, my_clock() - t);
     }
     DPU_ASSERT(dpu_sync(dpu_set));
     t = my_clock() - t;
@@ -219,24 +219,24 @@ __attribute__((noinline)) void compute_loop(
 
 
 void init_tuples(tuple_t *a, uint32_t size) {
-	for (uint32_t i = 0; i < size; i++) {
-		a[i].key = i + 1;
-		//a[i].value = i + 1;
-	}
+    for (uint32_t i = 0; i < size; i++) {
+        a[i].key = i + 1;
+        //a[i].value = i + 1;
+    }
 }
 
 void shuffle_tuples(tuple_t *a, uint32_t size) {
-	for (uint32_t i = 0; i < size; i++) {
-		int j = rand() % size;
-		tuple_t tmp = a[i];
-		a[i] = a[j];
-		a[j] = tmp;
-	}
+    for (uint32_t i = 0; i < size; i++) {
+        int j = rand() % size;
+        tuple_t tmp = a[i];
+        a[i] = a[j];
+        a[j] = tmp;
+    }
 }
 
 void generate_dataset1(tuple_t *a, uint32_t size) {
-	init_tuples(a, size);
-	shuffle_tuples(a, size);
+    init_tuples(a, size);
+    shuffle_tuples(a, size);
 }
 
 void partition_tuples(tuple_t *a, uint32_t size, tuple_t *par, uint32_t par_num, uint32_t par_off, uint32_t par_size) {
@@ -248,9 +248,9 @@ void partition_tuples(tuple_t *a, uint32_t size, tuple_t *par, uint32_t par_num,
 
     for (uint32_t i = 0; i < size; i++) {
         uint32_t par_id = a[i].key % par_num;
-	par[offset[par_id]] = a[i];
-	offset[par_id]++;
-	//assert(offset[par_id] % par_size != 0);
+    par[offset[par_id]] = a[i];
+    offset[par_id]++;
+    //assert(offset[par_id] % par_size != 0);
     }
 }
 
