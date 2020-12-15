@@ -33,7 +33,7 @@ typedef struct {
     uint32_t pos_mask;
     uint32_t pos_shift;
     bool     is_rd_cache;
-    uint32_t memory_size;
+    uint32_t member_num;
     char    *memory;
 } cache_mgr_t;
 
@@ -51,40 +51,33 @@ uint32_t __log2(uint32_t value) {
     return x;
 }
 
-void init_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {
-    assert(memory_size % CACHE_SIZE == 0);
+void reset_cache(cache_mgr_t *mgr, void *memory, uint32_t member_num, bool is_rd_cache) {
+    assert((member_num * sizeof(tuple_t)) % CACHE_SIZE == 0);
 
-    memset(mgr, 0, sizeof(cache_mgr_t));
-    
-    mgr->pos_mask = TUPLES_PER_CACHE - 1;
-    assert((mgr->pos_mask & TUPLES_PER_CACHE) == 0);
-
-    mgr->pos_shift = __log2(sizeof(tuple_t));
-    mgr->memory_size = memory_size;
-    mgr->is_rd_cache = is_rd_cache;
-    mgr->memory = memory;
-
-    mgr->cache.buffer = malloc(CACHE_SIZE);
-    assert(mgr->cache.buffer != NULL);
-
-    mgr->cache.pos = INVALID_POS;
-    mgr->cache.begin_pos = INVALID_POS;
-    mgr->cache.cnt = 0;
-
-//    printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, memory_size: %u\n",
-  //         mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->memory_size);
-}
-
-void reset_cache(cache_mgr_t *mgr, void *memory, uint32_t memory_size, bool is_rd_cache) {
-    assert(memory_size % CACHE_SIZE == 0);
-
-    mgr->memory_size = memory_size;
+    mgr->member_num = member_num;
     mgr->is_rd_cache = is_rd_cache;
     mgr->memory = memory;  // maybe new memory
 
     mgr->cache.pos = INVALID_POS;
     mgr->cache.begin_pos = INVALID_POS;
     mgr->cache.cnt = 0;
+}
+
+void init_cache(cache_mgr_t *mgr, void *memory, uint32_t member_num, bool is_rd_cache) {
+    memset(mgr, 0, sizeof(cache_mgr_t));
+    
+    mgr->pos_mask = TUPLES_PER_CACHE - 1;
+    assert((mgr->pos_mask & TUPLES_PER_CACHE) == 0);
+
+    mgr->pos_shift = __log2(sizeof(tuple_t));
+
+    mgr->cache.buffer = malloc(CACHE_SIZE);
+    assert(mgr->cache.buffer != NULL);
+
+    reset_cache(mgr, memory, member_num, is_rd_cache);
+
+//    printf("pos_mask: 0x%x, member_num: %u, pos_shift: %u, member_num: %u\n",
+  //         mgr->pos_mask, TUPLES_PER_CACHE, mgr->pos_shift, mgr->member_num);
 }
 
 void flush_cache(cache_mgr_t *mgr) {
@@ -184,14 +177,14 @@ void merge_sort(tuple_t *a, uint32_t len, tuple_t *tmp) {
     dst = &cache[2];
     for (uint32_t width = 1; width < len; width <<= 1) {
         if (toggle & 1) {
-            reset_cache(srca, tmp, len * sizeof(tuple_t), true);
-            reset_cache(srcb, tmp, len * sizeof(tuple_t), true);
-            reset_cache(dst, a, len * sizeof(tuple_t), false);
+            reset_cache(srca, tmp, len, true);
+            reset_cache(srcb, tmp, len, true);
+            reset_cache(dst, a, len, false);
         }
         else {
-            reset_cache(srca, a, len * sizeof(tuple_t), true);
-            reset_cache(srcb, a, len * sizeof(tuple_t), true);
-            reset_cache(dst, tmp, len * sizeof(tuple_t), false);
+            reset_cache(srca, a, len, true);
+            reset_cache(srcb, a, len, true);
+            reset_cache(dst, tmp, len, false);
         }
         
         //clock_t t = clock();
@@ -347,17 +340,17 @@ int main(int argc, char *argv[]) {
 
     printf("begin merge sort and merge join\n");
 
-    init_cache(&cache[0], a, size * sizeof(tuple_t), true);
-    init_cache(&cache[1], b, size * sizeof(tuple_t), true);
-    init_cache(&cache[2], tmp, size * sizeof(tuple_t), false);
+    init_cache(&cache[0], a, size, true);
+    init_cache(&cache[1], b, size, true);
+    init_cache(&cache[2], tmp, size, false);
 
     clock_t t = clock();
 
     merge_sort(a, size, tmp);
     merge_sort(b, size, tmp);
 
-    reset_cache(&cache[0], a, size * sizeof(tuple_t), true);
-    reset_cache(&cache[1], b, size * sizeof(tuple_t), true);
+    reset_cache(&cache[0], a, size, true);
+    reset_cache(&cache[1], b, size, true);
     uint32_t matches = merge_join(&cache[0], &cache[1], size, size, tmp);
 
     t = clock() - t;
