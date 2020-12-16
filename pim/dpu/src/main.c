@@ -34,20 +34,20 @@ uint32_t wcache_index[NR_TASKLETS] = {0};
 uintptr_t data_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER;
 uintptr_t tmp_begin = (uintptr_t)DPU_MRAM_HEAP_POINTER + MRAM_SIZE + MRAM_SIZE;
 
-void flush_cache(uint8_t tid, __mram_ptr tuple_t *wmem, uint32_t * mram_index) {
-
-    if(wcache_index[tid] == 0) return;
+void flush_cache(uint8_t tid, __mram_ptr tuple_t *wmem, uint32_t *mram_index) {
+    if (wcache_index[tid] == 0)
+        return;
     mram_write(wcache[tid], &wmem[*mram_index], sizeof(tuple_t) * wcache_index[tid]);
     *mram_index += wcache_index[tid];
     wcache_index[tid] = 0;
 }
 
-void cache_write(uint8_t tid, const tuple_t * tp, 
-        __mram_ptr tuple_t *wmem, uint32_t * mram_index) {
+void cache_write(uint8_t tid, const tuple_t *tp, 
+        __mram_ptr tuple_t *wmem, uint32_t *mram_index) {
 
     // if cache is full, first write it to mram
-    if(wcache_index[tid] == WCACHE_SIZE) {
-    flush_cache(tid, wmem, mram_index);
+    if (wcache_index[tid] == WCACHE_SIZE) {
+        flush_cache(tid, wmem, mram_index);
     }
 
     wcache[tid][wcache_index[tid]] = *tp;
@@ -133,15 +133,16 @@ uint32_t merge_join(__mram_ptr tuple_t *r, __mram_ptr tuple_t *s, uint32_t num_r
     tuple_t *tj = seqread_seek(s, &sr2[me()]);
     while (i < num_r && j < num_s) {
         if (ti->key < tj->key) {
-            i++;
             ti = seqread_get(ti, sizeof(tuple_t), &sr1[me()]);
+            i++;
         }
         else if (ti->key > tj->key) {
-            j++;
             tj = seqread_get(tj, sizeof(tuple_t), &sr2[me()]);
+            j++;
         }
         else {
             matches++;
+            tj = seqread_get(tj, sizeof(tuple_t), &sr2[me()]);
             j++;
         }
     }

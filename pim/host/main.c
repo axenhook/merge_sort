@@ -85,15 +85,18 @@ static void print_response_from_dpus(struct dpu_set_t dpu_set, algo_stats_t *sta
 {
     __attribute__((unused)) struct dpu_set_t dpu;
     unsigned int each_dpu;
+    uint32_t total_results = 0;
     DPU_FOREACH (dpu_set, dpu, each_dpu) {
-    uint32_t nb_results = 0;
-    for (uint32_t i = 0; i < NR_TASKLETS; i++) {
-        nb_results += stats[each_dpu].nb_results[i];
+        uint32_t nb_results = 0;
+        for (uint32_t i = 0; i < NR_TASKLETS; i++) {
+            nb_results += stats[each_dpu].nb_results[i];
 //            printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_results[i]);
-    }
+        }
         
-    printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
+        printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
+        total_results += nb_results;
     }
+    printf(">> " COLOR_GREEN "total matches %u" COLOR_NONE "\n", total_results);
 }
 
 struct get_response_from_dpus_context {
