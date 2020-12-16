@@ -114,9 +114,9 @@ uint32_t merge_join(tuple_t *r, tuple_t *s, uint32_t num_r, uint32_t num_s, void
 
 void partition_tuples(tuple_t *a, uint32_t size, tuple_t *par, uint32_t par_num, uint32_t par_off, uint32_t par_size) {
     uint32_t offset[par_num];
-    memset(offset, 0, sizeof(offset));
+   
     for (uint32_t i = 0; i < par_num; i++) {
-        offset[i] = par_off + i * par_size * 2;
+        offset[i] = par_off + i * par_size;
     }
 
     for (uint32_t i = 0; i < size; i++) {
@@ -209,7 +209,8 @@ void print_tuples(tuple_t *a, uint32_t size) {
 
 #endif
 
-#define NR_TASKLETS  16
+#define PAR_SIZE             ((uint32_t)((20 << 20) / 16))  // 20MB/16
+#define TUPLES_NUM_PER_PAR   ((uint32_t)(((PAR_SIZE) / sizeof(tuple_t))))
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -220,6 +221,11 @@ int main(int argc, char *argv[]) {
     int size = atoi(argv[1]);
     assert(size > 0);
 
+    uint32_t par_num = size / TUPLES_NUM_PER_PAR;
+    printf("tuples size: %d, tuples memory: %f MB, par_num: %u, tuples_num_per_par: %u\n",
+           size, (float)size * sizeof(tuple_t) / 1024 / 1024, par_num, TUPLES_NUM_PER_PAR);
+    assert(size % TUPLES_NUM_PER_PAR == 0);
+
     srand(time(NULL));
 
     tuple_t *a = malloc(size * sizeof(tuple_t));
@@ -228,7 +234,6 @@ int main(int argc, char *argv[]) {
     tuple_t *b = malloc(size * sizeof(tuple_t));
     assert(b != NULL);
 
-    printf("tuples size: %d, tuples memory: %f MB\n", size, (float)size * sizeof(tuple_t) / 1024 / 1024);
 
     generate_dataset(a, size);
     generate_dataset(b, size);
@@ -241,31 +246,30 @@ int main(int argc, char *argv[]) {
     tuple_t *par = malloc(size * sizeof(tuple_t) * 2);
     assert(par != NULL);
 
-    partition_tuples(a, size, par, NR_TASKLETS, 0, size / NR_TASKLETS);
-    partition_tuples(b, size, par, NR_TASKLETS, size / NR_TASKLETS, size / NR_TASKLETS);
+    partition_tuples(a, size, par, par_num, 0, TUPLES_NUM_PER_PAR * 2);
+    partition_tuples(b, size, par, par_num, TUPLES_NUM_PER_PAR, TUPLES_NUM_PER_PAR * 2);
 
-    uint32_t tuples_num_per_tasklet = size / NR_TASKLETS;
     uint32_t matches = 0;
 
     printf("begin merge sort and merge join\n");
 
     clock_t t = clock();
-    for (uint32_t i = 0; i < NR_TASKLETS; i++) {
-	uint32_t off = tuples_num_per_tasklet * i * 2;
-        merge_sort(&par[off], size, tmp);
-        merge_sort(&par[off+tuples_num_per_tasklet], size, tmp);
-        matches += merge_join(&par[off], &par[off+tuples_num_per_tasklet], size, size, tmp);
+    for (uint32_t i = 0; i < par_num; i++) {
+        uint32_t off = TUPLES_NUM_PER_PAR * i * 2;
+        merge_sort(&par[off], TUPLES_NUM_PER_PAR, tmp);
+        merge_sort(&par[off + TUPLES_NUM_PER_PAR], TUPLES_NUM_PER_PAR, tmp);
+        matches += merge_join(&par[off], &par[off + TUPLES_NUM_PER_PAR], TUPLES_NUM_PER_PAR, TUPLES_NUM_PER_PAR, tmp);
     }
 
     t = clock() - t;
     printf("time: %f ms, matches: %u\n", (float)t * 1000 / CLOCKS_PER_SEC, matches);
 
     print_tuples(par, size);
-    for (uint32_t i = 0; i < NR_TASKLETS; i++) {
-	uint32_t off = tuples_num_per_tasklet * i * 2;
-        assert(is_tuples_sorted(&par[off], tuples_num_per_tasklet));
-        assert(is_tuples_sorted(&par[off+tuples_num_per_tasklet], tuples_num_per_tasklet));
-    }
+//    for (uint32_t i = 0; i < par_num; i++) {
+//        uint32_t off = TUPLES_NUM_PER_PAR * i * 2;
+//        assert(is_tuples_sorted(&par[off], TUPLES_NUM_PER_PAR));
+//        assert(is_tuples_sorted(&par[off + TUPLES_NUM_PER_PAR], TUPLES_NUM_PER_PAR));
+//    }
 
     return 0;
 
