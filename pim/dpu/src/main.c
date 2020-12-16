@@ -43,11 +43,11 @@ void flush_cache(uint8_t tid, __mram_ptr tuple_t *wmem, uint32_t * mram_index) {
 }
 
 void cache_write(uint8_t tid, const tuple_t * tp, 
-		__mram_ptr tuple_t *wmem, uint32_t * mram_index) {
+        __mram_ptr tuple_t *wmem, uint32_t * mram_index) {
 
     // if cache is full, first write it to mram
     if(wcache_index[tid] == WCACHE_SIZE) {
-	flush_cache(tid, wmem, mram_index);
+    flush_cache(tid, wmem, mram_index);
     }
 
     wcache[tid][wcache_index[tid]] = *tp;
@@ -60,41 +60,34 @@ void merge(__mram_ptr tuple_t *a, uint32_t left, uint32_t mid, uint32_t right, _
     uint32_t k = left;
 
     // initialize the sequential readers to read from address in MRAM
-    uint8_t *curr_char1 = seqread_seek(&a[left], &sr1[me()]);
-    uint8_t *curr_char2 = seqread_seek(&a[mid], &sr2[me()]);
+    tuple_t *ti = seqread_seek(&a[left], &sr1[me()]);
+    tuple_t *tj = seqread_seek(&a[mid], &sr2[me()]);
 
     while (i < mid && j < right) {
-        __dma_aligned tuple_t ai, aj;
-	ai = *((tuple_t*)curr_char1);
-	aj = *((tuple_t*)curr_char2);
-        if (ai.key < aj.key) {
-            cache_write(me(), &ai, tmp, &k);
-	    curr_char1 = seqread_get(curr_char1, sizeof(tuple_t), &sr1[me()]);
+        if (ti->key < tj->key) {
+            cache_write(me(), ti, tmp, &k);
+            ti = seqread_get(ti, sizeof(tuple_t), &sr1[me()]);
             i++;
         } else {
-            cache_write(me(), &aj, tmp, &k);
-	    curr_char2 = seqread_get(curr_char2, sizeof(tuple_t), &sr2[me()]);
+            cache_write(me(), tj, tmp, &k);
+            tj = seqread_get(tj, sizeof(tuple_t), &sr2[me()]);
             j++;
         }
     }
 
     while (i < mid) {
-        tuple_t ai = *((tuple_t*)curr_char1);
-	cache_write(me(), &ai, tmp, &k);
-	curr_char1 = seqread_get(curr_char1, sizeof(tuple_t), &sr1[me()]);
+        cache_write(me(), ti, tmp, &k);
+        ti = seqread_get(ti, sizeof(tuple_t), &sr1[me()]);
         i++;
     }
 
     while (j < right) {
-        tuple_t aj= *((tuple_t*)curr_char2);
-	cache_write(me(), &aj, tmp, &k);
-	curr_char2 = seqread_get(curr_char2, sizeof(tuple_t), &sr2[me()]);
+        cache_write(me(), tj, tmp, &k);
+        tj = seqread_get(tj, sizeof(tuple_t), &sr2[me()]);
         j++;
     }
 
     flush_cache(me(), tmp, &k);
-
-//  memcpy(a + left, tmp + left, sizeof(tuple_t) * (right - left));
 }
 
 void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
@@ -136,14 +129,17 @@ void merge_sort(__mram_ptr tuple_t *a, uint32_t len, __mram_ptr tuple_t *tmp) {
 uint32_t merge_join(__mram_ptr tuple_t *r, __mram_ptr tuple_t *s, uint32_t num_r, uint32_t num_s) {//, void *output) {
     uint32_t i = 0, j = 0, matches = 0;
 
+    tuple_t *ti = seqread_seek(r, &sr1[me()]);
+    tuple_t *tj = seqread_seek(s, &sr2[me()]);
     while (i < num_r && j < num_s) {
-        tuple_t ai, aj;
-        mram_read(&r[i], &ai, sizeof(tuple_t));
-        mram_read(&s[j], &aj, sizeof(tuple_t));
-        if (ai.key < aj.key)
+        if (ti->key < tj->key) {
             i++;
-        else if (ai.key > aj.key)
+            ti = seqread_get(ti, sizeof(tuple_t), &sr1[me()]);
+        }
+        else if (ti->key > tj->key) {
             j++;
+            tj = seqread_get(tj, sizeof(tuple_t), &sr2[me()]);
+        }
         else {
             matches++;
             j++;

@@ -73,7 +73,7 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
     unsigned int each_dpu;
     DPU_FOREACH (rank, dpu, each_dpu) {
     uint32_t dpu_id = dpu_offset[rank_id] + each_dpu;
-        printf("dpu_id: %u, rank_id: %u, each_dpu: %u\n", dpu_id, rank_id, each_dpu);
+    //    printf("dpu_id: %u, rank_id: %u, each_dpu: %u\n", dpu_id, rank_id, each_dpu);
         DPU_ASSERT(dpu_prepare_xfer(dpu, &ctx->par[dpu_id * TUPLES_NUM *2]));
     }
     DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, 0, MRAM_SIZE * 2, DPU_XFER_DEFAULT));
@@ -89,7 +89,7 @@ static void print_response_from_dpus(struct dpu_set_t dpu_set, algo_stats_t *sta
     uint32_t nb_results = 0;
     for (uint32_t i = 0; i < NR_TASKLETS; i++) {
         nb_results += stats[each_dpu].nb_results[i];
-            printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_results[i]);
+//            printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_results[i]);
     }
         
     printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
@@ -123,7 +123,7 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
         average_dpu_time += stats[this_dpu].exec_time;
         slowest_dpu_time = MAX(stats[this_dpu].exec_time, slowest_dpu_time);
         slowest_dpu_in_rank_time = MAX(stats[this_dpu].exec_time, slowest_dpu_in_rank_time);
-        dpulog_read_for_dpu(dpu.dpu, stdout);
+    //    dpulog_read_for_dpu(dpu.dpu, stdout);
     }
 
     *slowest = slowest_dpu_time;
@@ -290,7 +290,7 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     partition_tuples(s, nb_mram * TUPLES_NUM, par, nb_mram * NR_TASKLETS, TUPLES_NUM / NR_TASKLETS, TUPLES_NUM / NR_TASKLETS);
 
     if (load_mram) {
-        printf("Preparing %u MRAMs: loading files\n", nb_mram);
+        printf("Preparing %u MRAMs \n", nb_mram);
         struct load_and_copy_mram_file_into_dpus_context ctx = { .dpu_offset = dpu_offset, .par = par };
         // Using callback to load each mrams (from disk) in parallel
         DPU_ASSERT(dpu_callback(dpu_set, load_and_copy_mram_file_into_dpus, &ctx, DPU_CALLBACK_DEFAULT));
