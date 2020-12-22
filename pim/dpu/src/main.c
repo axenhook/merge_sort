@@ -9,7 +9,7 @@
 #include <string.h>
 #include "request.h"
 
-//#define SEQREAD_CACHE_SIZE 256
+//#define SEQREAD_CACHE_SIZE 1024 
 #include "seqread.h"
 
 #ifdef TRACE
@@ -154,6 +154,7 @@ int main()
 {
     if (me() == 0) {
         perfcounter_config(COUNT_CYCLES, true);
+        //perfcounter_config(COUNT_INSTRUCTIONS, true);
         mem_reset();
         memset(&DPU_STATS_VAR, 0, sizeof(DPU_STATS_VAR));
     }

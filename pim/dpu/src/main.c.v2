@@ -241,6 +241,7 @@ uint32_t tuples_sorted(cache_mgr_t *r0, cache_mgr_t *r1, uint32_t num) {
 int main()
 {
     if (me() == 0) {
+        //perfcounter_config(COUNT_INSTRUCTIONS, true);
         perfcounter_config(COUNT_CYCLES, true);
         mem_reset();
         memset(&DPU_STATS_VAR, 0, sizeof(DPU_STATS_VAR));

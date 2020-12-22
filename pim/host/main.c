@@ -26,6 +26,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "request.h"
 
@@ -65,7 +66,8 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
 {
     struct load_and_copy_mram_file_into_dpus_context *ctx = (struct load_and_copy_mram_file_into_dpus_context *)args;
     uint32_t *dpu_offset = ctx->dpu_offset;
-
+    unsigned long long t = my_clock(); 
+    printf("thread_id: %lu, rank_id: %u, begin t: %llu ns\n", pthread_self(), rank_id, t);
     uint32_t nr_dpus;
     DPU_ASSERT(dpu_get_nr_dpus(rank, &nr_dpus));
 
@@ -78,6 +80,7 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
     }
     DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, 0, MRAM_SIZE * 2, DPU_XFER_DEFAULT));
 
+    printf("rank_id: %u, t: %llu ns\n", rank_id, my_clock() - t);
     return DPU_OK;
 }
 
@@ -93,7 +96,7 @@ static void print_response_from_dpus(struct dpu_set_t dpu_set, algo_stats_t *sta
 //            printf(">> " COLOR_GREEN "dpu %u tasklet %u matches %u" COLOR_NONE "\n", each_dpu, i, stats[each_dpu].nb_results[i]);
         }
         
-        printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
+    //    printf(">> " COLOR_GREEN "dpu %u matches %u" COLOR_NONE "\n", each_dpu, nb_results);
         total_results += nb_results;
     }
     printf(">> " COLOR_GREEN "total matches %u" COLOR_NONE "\n", total_results);
