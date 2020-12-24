@@ -138,8 +138,10 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
     double average_dpu_time = *average;
     unsigned int each_dpu;
     __attribute__((unused)) struct dpu_set_t dpu;
+    uint32_t nr_dpus;
+    DPU_ASSERT(dpu_get_nr_dpus(rank, &nr_dpus));
     
-    printf("thread: %lu, rank: %u, get response. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - ctx->time[rank_id], ctx->loop[rank_id]);
+    printf("thread: %lu, rank: %u, get response. nr_dpus: %u, time: %llu ns, loop: %u\n", pthread_self(), rank_id, nr_dpus, my_clock() - ctx->time[rank_id], ctx->loop[rank_id]);
 
     DPU_FOREACH (rank, dpu, each_dpu) {
         uint32_t this_dpu = each_dpu + dpu_offset[rank_id];
@@ -164,7 +166,7 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
             DPU_ASSERT(dpu_prepare_xfer(dpu, &ctx->par[dpu_id * TUPLES_NUM *2]));
         }
         DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, 0, MRAM_SIZE * 2, DPU_XFER_DEFAULT));
-        printf("thread: %lu, rank: %u, load mram data. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+        printf("thread: %lu, rank: %u, send mram data. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
         t = my_clock();
     
         DPU_ASSERT(dpu_broadcast_to(rank, STR(DPU_REQUEST_VAR), 0, ctx->request, sizeof(algo_request_t), DPU_XFER_ASYNC));
@@ -178,11 +180,8 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
         DPU_FOREACH (rank, dpu, each_dpu) {
             DPU_ASSERT(dpu_prepare_xfer(dpu, &ctx->stats[each_dpu + ctx->dpu_offset[rank_id]]));
         }
-        printf("thread: %lu, rank: %u, response prepare xfer. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
-        t = my_clock();
-
         DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_FROM_DPU, STR(DPU_STATS_VAR), 0, sizeof(algo_stats_t), DPU_XFER_ASYNC));
-        printf("thread: %lu, rank: %u, response push xfer. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+        printf("thread: %lu, rank: %u, response xfer. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
         t = my_clock();
 
         DPU_ASSERT(dpu_callback(rank, get_response_from_dpus, ctx, DPU_CALLBACK_ASYNC));
