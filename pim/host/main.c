@@ -80,7 +80,7 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
     }
     DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, 0, MRAM_SIZE * 2, DPU_XFER_DEFAULT));
 
-    printf("rank_id: %u, t: %llu ns\n", rank_id, my_clock() - t);
+    printf("thread_id: %lu, load mram data finished. rank_id: %u, t: %llu ns\n", pthread_self(), rank_id, my_clock() - t);
     return DPU_OK;
 }
 
@@ -110,13 +110,25 @@ struct get_response_from_dpus_context {
     void *request;
     uint64_t *time;
     uint32_t nr_ranks;
+    uint32_t *rank_id;
     algo_stats_t *stats;
     uint32_t *dpu_offset;
 };
 
+#define MAX_RANKS  128
+#define RANK_ID_MASK (MAX_RANKS - 1)
+
 dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void *args)
 {
     struct get_response_from_dpus_context *ctx = (struct get_response_from_dpus_context *)args;
+
+    dpu_id_t real_rank_id = dpu_get_rank_id(rank.list.ranks[0]);
+    //printf("thread: %lu, get response, nr_ranks: %u, rank_id: %u, real rank_id: %u\n", pthread_self(), rank.list.nr_ranks, rank_id, real_rank_id);
+    real_rank_id &= RANK_ID_MASK;
+    if (ctx->rank_id[real_rank_id] != rank_id) {
+        rank_id = ctx->rank_id[real_rank_id];
+    }
+
     uint32_t *dpu_offset = ctx->dpu_offset;
     algo_stats_t *stats = ctx->stats;
     uint64_t *slowest = &ctx->dpu_slowest[rank_id];
@@ -133,6 +145,7 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
         average_dpu_time += stats[this_dpu].exec_time;
         slowest_dpu_time = MAX(stats[this_dpu].exec_time, slowest_dpu_time);
         slowest_dpu_in_rank_time = MAX(stats[this_dpu].exec_time, slowest_dpu_in_rank_time);
+       // printf("thread: %lu, get response, rank: %u, dpu: %u\n", pthread_self(), rank_id, each_dpu);
     //    dpulog_read_for_dpu(dpu.dpu, stdout);
     }
 
@@ -140,21 +153,38 @@ dpu_error_t get_response_from_dpus(struct dpu_set_t rank, uint32_t rank_id, void
     *average = average_dpu_time;
     *rank_average += slowest_dpu_in_rank_time;
 
-    printf("get response, rank: %u, time: %llu, loop: %u\n", rank_id, my_clock() - ctx->time[rank_id], ctx->loop[rank_id]);
+    printf("thread: %lu, rank: %u, get response. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - ctx->time[rank_id], ctx->loop[rank_id]);
     ctx->time[rank_id] = my_clock();
 
     ctx->loop[rank_id]--;
     if (ctx->loop[rank_id]) {
+	unsigned long long t = my_clock();
         DPU_ASSERT(dpu_broadcast_to(rank, STR(DPU_REQUEST_VAR), 0, ctx->request, sizeof(algo_request_t), DPU_XFER_ASYNC));
+        printf("thread: %lu, rank: %u, send request. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+        t = my_clock();
+
         DPU_ASSERT(dpu_launch(rank, DPU_ASYNCHRONOUS));
+        printf("thread: %lu, rank: %u, dpu launch. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+        t = my_clock();
+
         struct dpu_set_t dpu;
         uint32_t each_dpu;
         DPU_FOREACH (rank, dpu, each_dpu) {
             DPU_ASSERT(dpu_prepare_xfer(dpu, &ctx->stats[each_dpu + ctx->dpu_offset[rank_id]]));
         }
+        printf("thread: %lu, rank: %u, response prepare xfer. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+        t = my_clock();
+
         DPU_ASSERT(dpu_push_xfer(rank, DPU_XFER_FROM_DPU, STR(DPU_STATS_VAR), 0, sizeof(algo_stats_t), DPU_XFER_ASYNC));
+        printf("thread: %lu, rank: %u, response push xfer. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+        t = my_clock();
+
         DPU_ASSERT(dpu_callback(rank, get_response_from_dpus, ctx, DPU_CALLBACK_ASYNC));
+        printf("thread: %lu, rank: %u, response prepare callback. time: %llu ns, loop: %u\n", pthread_self(), rank_id, my_clock() - t, ctx->loop[rank_id]);
+
+        ctx->time[rank_id] = my_clock();
     }
+
     return DPU_OK;
 }
 
@@ -219,6 +249,9 @@ __attribute__((noinline)) void compute_once(
     for (uint32_t i = 0; i < ctx->nr_ranks; i++) {
         ctx->time[i] = t;
     }
+    
+    printf("broadcast request\n");
+    
     DPU_ASSERT(dpu_broadcast_to(dpu_set, STR(DPU_REQUEST_VAR), 0, (void *)request, sizeof(algo_request_t), DPU_XFER_ASYNC));
     DPU_ASSERT(dpu_launch(dpu_set, DPU_ASYNCHRONOUS));
     struct dpu_set_t dpu, rank;
@@ -235,15 +268,16 @@ __attribute__((noinline)) void compute_once(
 __attribute__((noinline)) void compute_loop(
     struct dpu_set_t dpu_set, uint32_t nb_loop, struct get_response_from_dpus_context *ctx, algo_request_t *request)
 {
-    unsigned long long t = my_clock();
+    nb_loop = nb_loop;
+    //unsigned long long t = my_clock();
     //for (unsigned int each_loop = 0; each_loop < nb_loop; each_loop++) {
   //      unsigned long long t = my_clock();
         compute_once(dpu_set, ctx, request);
 //  printf("loop: %d, time: %llu ns\n", each_loop, my_clock() - t);
     //}
     DPU_ASSERT(dpu_sync(dpu_set));
-    t = my_clock() - t;
-    printf("nb_loop: %d, time: %llu ns, throughput: %u\n", nb_loop, t, (unsigned int)(((unsigned long long)nb_loop*1e9) / t));
+    //t = my_clock() - t;
+    //printf("nb_loop: %d, time: %llu ns, throughput: %u\n", nb_loop, t, (unsigned int)(((unsigned long long)nb_loop*1e9) / t));
 }
 
 
@@ -334,11 +368,16 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
     double rank_average[nr_ranks];
     uint32_t loop[nr_ranks];
     uint64_t time[nr_ranks];
+    uint32_t rank_id[MAX_RANKS];
     memset(dpu_slowest, 0, sizeof(dpu_slowest));
     memset(dpu_average, 0, sizeof(dpu_average));
     memset(rank_average, 0, sizeof(rank_average));
+    memset(rank_id, 0xff, sizeof(rank_id));
     for (uint32_t i = 0; i < nr_ranks; i++) {
         loop[i] = nb_loop;
+        dpu_id_t real_rank_id = dpu_get_rank_id(dpu_set.list.ranks[i]) & RANK_ID_MASK;
+        printf("change %u %u->%u\n", real_rank_id, rank_id[real_rank_id], i);
+        rank_id[real_rank_id] = i;
     }
 
     printf("Computing %u loop\n", nb_loop);
@@ -346,18 +385,18 @@ static void allocated_and_compute(struct dpu_set_t dpu_set, uint32_t nr_ranks, a
         .dpu_average = dpu_average,
         .rank_average = rank_average,
         .loop = loop,
-	.time = time,
-	.nr_ranks = nr_ranks,
+        .time = time,
+        .rank_id = rank_id,
+        .nr_ranks = nr_ranks,
         .request = request,
         .stats = stats,
         .dpu_offset = dpu_offset };
     compute_loop(dpu_set, nb_loop, &response_ctx, request);
 
     for (uint32_t i = 0; i < nr_ranks; i++) {
-        if (loop[i]) {
-	    sleep(1);
-	    i = 0;
-	}
+        while (loop[i]) {
+            sleep(1);
+        }
     }
     printf("all loop finished\n");
 
@@ -399,7 +438,7 @@ int main(int argc, char **argv)
     DPU_ASSERT(dpu_alloc(nb_mram, "cycleAccurate=true", &dpu_set));
     DPU_ASSERT(dpu_load_from_incbin(dpu_set, &dpu_binary, NULL));
     DPU_ASSERT(dpu_get_nr_ranks(dpu_set, &nr_ranks));
-
+    printf("alloc ranks: %u, type: %u\n", nr_ranks, dpu_set.kind);
     allocated_and_compute(dpu_set, nr_ranks, &request, nb_mram, nb_loop, load_mram);
 
     DPU_ASSERT(dpu_free(dpu_set));
