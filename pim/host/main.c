@@ -67,9 +67,7 @@ dpu_error_t load_and_copy_mram_file_into_dpus(struct dpu_set_t rank, uint32_t ra
     struct load_and_copy_mram_file_into_dpus_context *ctx = (struct load_and_copy_mram_file_into_dpus_context *)args;
     uint32_t *dpu_offset = ctx->dpu_offset;
     unsigned long long t = my_clock(); 
-    printf("thread_id: %lu, rank_id: %u, begin t: %llu ns\n", pthread_self(), rank_id, t);
-    uint32_t nr_dpus;
-    DPU_ASSERT(dpu_get_nr_dpus(rank, &nr_dpus));
+    printf("thread_id: %lu, rank_id: %u, begin t: %llu\n", pthread_self(), rank_id, t);
 
     struct dpu_set_t dpu;
     unsigned int each_dpu;
